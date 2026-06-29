@@ -72,6 +72,12 @@ class MicStream:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
+        time.sleep(0.1)
+        if self.proc.poll() is not None:
+            stderr = ""
+            if self.proc.stderr:
+                stderr = self.proc.stderr.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"microphone stream failed to open. {stderr}".strip())
         return self
 
     def __exit__(self, *_args: object) -> None:

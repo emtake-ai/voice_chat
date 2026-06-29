@@ -104,6 +104,8 @@ Defaults:
 - `--max-queries 5`
 - `--playback-retries 3`
 - `--playback-retry-delay 0.8`
+- `--mic-retries 5`
+- `--mic-retry-delay 0.8`
 - `--device-settle-seconds 0.5`
 
 For senior reports, use `--type LLMREPORTS`.
@@ -113,5 +115,6 @@ Each line in `dialog.txt` is JSON containing timestamp, account, sensor, case, q
 Use `--no-reference` to skip the startup API reference, `--no-raw` to skip the raw relay JSON, or `--no-summary` to skip the fetched-data summary.
 
 If ALSA reports `Device or resource busy`, `main.py` retries speaker playback before listening. Increase `--playback-retries` or `--device-settle-seconds` if the USB device releases slowly.
+If the microphone reports `Device or resource busy`, increase `--mic-retries`, `--mic-retry-delay`, or `--device-settle-seconds`.
 
 By default, `main.py` exits after one interview batch. Use `--loop` only when you want repeated polling with `--interval-seconds`.

@@ -46,6 +46,7 @@ class SensorQuery:
     case: str
     condition: str
     query: str
+    is_template: bool = False
 
 
 GENERAL_QUERIES = [
@@ -103,6 +104,8 @@ class Settings:
     max_queries: int
     playback_retries: int
     playback_retry_delay: float
+    mic_retries: int
+    mic_retry_delay: float
     device_settle_seconds: float
     interval_seconds: float
     once: bool
@@ -129,12 +132,32 @@ def load_queries(path: str) -> list[SensorQuery]:
                 row = json.loads(line)
             except json.JSONDecodeError as exc:
                 raise SystemExit(f"{path}:{line_number}: invalid JSON: {exc}") from exc
+            if not isinstance(row, dict):
+                raise SystemExit(f"{path}:{line_number}: expected JSON object")
+
+            question = row.get("query")
+            is_template = False
+            if question is None:
+                question = row.get("question_template")
+                is_template = question is not None
+
+            missing = [
+                key
+                for key in ("sensor", "case", "condition")
+                if row.get(key) is None
+            ]
+            if question is None:
+                missing.append("query or question_template")
+            if missing:
+                raise SystemExit(f"{path}:{line_number}: missing required field(s): {', '.join(missing)}")
+
             queries.append(
                 SensorQuery(
                     sensor=str(row["sensor"]),
                     case=str(row["case"]),
                     condition=str(row["condition"]),
-                    query=str(row["query"]),
+                    query=str(question),
+                    is_template=is_template,
                 )
             )
     return queries
@@ -303,8 +326,10 @@ def detect_abnormal_cases(data: dict[str, Any], queries: list[SensorQuery], base
 
     if db_max is not None and db_max > 85:
         matched_cases.add("very_loud_noise")
+        matched_cases.add("high_noise")
     elif db_max is not None and db_max > 70:
         matched_cases.add("loud_noise")
+        matched_cases.add("high_noise")
 
     if breath_max is not None and breath_max > 24:
         matched_cases.add("fast_breathing")
@@ -312,6 +337,7 @@ def detect_abnormal_cases(data: dict[str, Any], queries: list[SensorQuery], base
         matched_cases.add("slow_breathing")
     if breath_max is not None and breath_max <= 0:
         matched_cases.add("no_breathing_detected")
+        matched_cases.add("no_breathing_signal")
 
     if room_max is not None and room_max > 35.0:
         matched_cases.add("room_very_hot")
@@ -326,12 +352,16 @@ def detect_abnormal_cases(data: dict[str, Any], queries: list[SensorQuery], base
 
     if humidity_min is not None and humidity_min < 20:
         matched_cases.add("very_dry")
+        matched_cases.add("room_too_dry")
     elif humidity_min is not None and humidity_min < 30:
         matched_cases.add("too_dry")
+        matched_cases.add("room_too_dry")
     if humidity_max is not None and humidity_max > 80:
         matched_cases.add("very_humid")
+        matched_cases.add("room_too_humid")
     elif humidity_max is not None and humidity_max > 70:
         matched_cases.add("too_humid")
+        matched_cases.add("room_too_humid")
     if (humidity_min is not None and humidity_min < 40) or (humidity_max is not None and humidity_max > 60):
         matched_cases.add("bad_sleep_humidity")
 
@@ -359,9 +389,11 @@ def abnormal_value_text(data: dict[str, Any], match: SensorQuery, baseline: floa
         ),
         "loud_noise": f"실내 소음 최고값은 {format_value(db_max, '데시벨')}입니다.",
         "very_loud_noise": f"실내 소음 최고값은 {format_value(db_max, '데시벨')}입니다.",
+        "high_noise": f"실내 소음 최고값은 {format_value(db_max, '데시벨')}입니다.",
         "fast_breathing": f"호흡 최고값은 {format_value(breath_max)}입니다.",
         "slow_breathing": f"호흡 최저값은 {format_value(breath_min)}입니다.",
         "no_breathing_detected": f"호흡 최고값은 {format_value(breath_max)}입니다.",
+        "no_breathing_signal": f"호흡 최고값은 {format_value(breath_max)}입니다.",
         "room_too_hot": f"실내 온도 최고값은 {format_value(room_max, '도')}입니다.",
         "room_very_hot": f"실내 온도 최고값은 {format_value(room_max, '도')}입니다.",
         "room_too_cold": f"실내 온도 최저값은 {format_value(room_min, '도')}입니다.",
@@ -373,8 +405,10 @@ def abnormal_value_text(data: dict[str, Any], match: SensorQuery, baseline: floa
         ),
         "too_dry": f"실내 습도 최저값은 {format_value(humidity_min, '퍼센트')}입니다.",
         "very_dry": f"실내 습도 최저값은 {format_value(humidity_min, '퍼센트')}입니다.",
+        "room_too_dry": f"실내 습도 최저값은 {format_value(humidity_min, '퍼센트')}입니다.",
         "too_humid": f"실내 습도 최고값은 {format_value(humidity_max, '퍼센트')}입니다.",
         "very_humid": f"실내 습도 최고값은 {format_value(humidity_max, '퍼센트')}입니다.",
+        "room_too_humid": f"실내 습도 최고값은 {format_value(humidity_max, '퍼센트')}입니다.",
         "bad_sleep_humidity": (
             f"실내 습도 최저값은 {format_value(humidity_min, '퍼센트')}, 최고값은 {format_value(humidity_max, '퍼센트')}입니다."
         ),
@@ -382,7 +416,52 @@ def abnormal_value_text(data: dict[str, Any], match: SensorQuery, baseline: floa
     return value_by_case.get(match.case, "")
 
 
+class SensorTemplateValues(dict[str, str]):
+    def __missing__(self, key: str) -> str:
+        return "N/A"
+
+
+def format_sensor_query_template(template: str, data: dict[str, Any], match: SensorQuery, baseline: float) -> str:
+    temp_min, temp_max = minmax(data.get("Temp"))
+    body_min = normalize_body_temperature(temp_min, baseline)
+    body_max = normalize_body_temperature(temp_max, baseline)
+    breath_min, breath_max = minmax(data.get("Breath"))
+    _db_min, db_max = minmax(data.get("dB"))
+    room_min, room_max = minmax(data.get("IndoorTemp"))
+    humidity_min, humidity_max = minmax(data.get("Humidity"))
+
+    name = data.get("name")
+    if not isinstance(name, str) or not name:
+        name = "대상자"
+
+    body_temperature = body_min if match.case == "low_body_temperature" else body_max
+    room_temperature = room_min if match.case == "room_too_cold" else room_max
+    humidity = humidity_min if match.case in {"room_too_dry", "too_dry", "very_dry"} else humidity_max
+    breathing_rate = breath_min if match.case == "slow_breathing" else breath_max
+
+    values = SensorTemplateValues(
+        name=name,
+        body_temperature=format_value(body_temperature),
+        thermal_raw_min=format_value(temp_min),
+        thermal_raw_max=format_value(temp_max),
+        noise_db=format_value(db_max),
+        humidity=format_value(humidity),
+        humidity_min=format_value(humidity_min),
+        humidity_max=format_value(humidity_max),
+        room_temperature=format_value(room_temperature),
+        temperature_min=format_value(room_min),
+        temperature_max=format_value(room_max),
+        breathing_rate=format_value(breathing_rate),
+        sleep_humidity=format_value(humidity),
+        sleep_temperature=format_value(room_temperature),
+    )
+    return template.format_map(values)
+
+
 def build_interview_text(data: dict[str, Any], settings: Settings, match: SensorQuery, prefix: str) -> str:
+    if match.is_template:
+        return format_sensor_query_template(match.query, data, match, settings.body_temp_baseline)
+
     value_text = abnormal_value_text(data, match, settings.body_temp_baseline)
     if value_text:
         return f"{prefix}{value_text} {match.query}"
@@ -456,6 +535,29 @@ def transcribe_answer(asr: WhisperModel, audio: object) -> str:
     return " ".join(segment.text.strip() for segment in segments).strip()
 
 
+async def listen_for_answer(
+    segmenter: SpeechSegmenter,
+    mic_device: str,
+    mic_retries: int,
+    mic_retry_delay: float,
+) -> object:
+    last_error = ""
+    for attempt in range(mic_retries + 1):
+        try:
+            with MicStream(mic_device) as mic:
+                return segmenter.listen_once(mic)
+        except RuntimeError as exc:
+            last_error = str(exc)
+            if "Device or resource busy" not in last_error or attempt >= mic_retries:
+                break
+
+            wait_seconds = mic_retry_delay * (attempt + 1)
+            print(f"Microphone busy; retrying capture in {wait_seconds:.1f}s...")
+            await asyncio.sleep(wait_seconds)
+
+    raise RuntimeError(f"microphone capture failed on {mic_device}: {last_error}")
+
+
 def append_dialog(settings: Settings, match: SensorQuery, question: str, answer: str) -> None:
     row = {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -516,8 +618,12 @@ async def run_once(
             settings.playback_retry_delay,
         )
         print("Listening for answer...")
-        with MicStream(settings.mic_device) as mic:
-            audio = segmenter.listen_once(mic)
+        audio = await listen_for_answer(
+            segmenter,
+            settings.mic_device,
+            settings.mic_retries,
+            settings.mic_retry_delay,
+        )
         answer = transcribe_answer(asr, audio)
         print(f"Answer: {answer}")
         append_dialog(settings, match, text, answer)
@@ -556,7 +662,7 @@ def parse_args() -> Settings:
     parser = argparse.ArgumentParser(description="Sensor abnormal-case TTS announcer")
     parser.add_argument("--api-url", default=os.getenv("SENSOR_API_URL", API_URL))
     parser.add_argument("--type", dest="report_type", default=os.getenv("REPORT_TYPE", "LLMREPORT"))
-    parser.add_argument("--account", default=os.getenv("ACCOUNT", "test2@test.com"))
+    parser.add_argument("--account", default=os.getenv("ACCOUNT", "test5@test.com"))
     parser.add_argument("--cmd", default=os.getenv("CMD", "ALL"))
     parser.add_argument("--val", default=os.getenv("VAL"))
     parser.add_argument("--date", default=os.getenv("DATE"))
@@ -585,6 +691,12 @@ def parse_args() -> Settings:
         "--device-settle-seconds",
         type=float,
         default=float(os.getenv("DEVICE_SETTLE_SECONDS", "0.5")),
+    )
+    parser.add_argument("--mic-retries", type=int, default=int(os.getenv("MIC_RETRIES", "5")))
+    parser.add_argument(
+        "--mic-retry-delay",
+        type=float,
+        default=float(os.getenv("MIC_RETRY_DELAY", "0.8")),
     )
     parser.add_argument("--interval-seconds", type=float, default=float(os.getenv("INTERVAL_SECONDS", "60")))
     parser.add_argument("--body-temp-baseline", type=float, default=float(os.getenv("BODY_TEMP_BASELINE", "36.5")))
