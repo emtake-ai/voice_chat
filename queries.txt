@@ -1,0 +1,25 @@
+{"sensor":"thermal","case":"high_body_temperature","condition":"body_temperature > 37.8","query":"체온이 조금 높게 감지되었습니다. 열이 나거나 몸이 불편하신가요?"}
+{"sensor":"thermal","case":"very_high_body_temperature","condition":"body_temperature > 39.0","query":"체온이 매우 높게 감지되었습니다. 도움이 필요하거나 의료 조치가 필요하신가요?"}
+{"sensor":"thermal","case":"low_body_temperature","condition":"body_temperature < 35.5","query":"체온이 낮게 감지되었습니다. 춥거나 몸에 힘이 없으신가요?"}
+{"sensor":"thermal","case":"hot_object_detected","condition":"object_temperature > 55.0","query":"주변에 뜨거운 물체가 감지되었습니다. 히터, 뜨거운 음료, 조리 기구 같은 것이 가까이에 있나요?"}
+{"sensor":"thermal","case":"sudden_temperature_rise","condition":"temperature_rise_rate is high","query":"열화상 온도 값이 갑자기 상승했습니다. 열원 근처로 이동하셨나요?"}
+{"sensor":"mic","case":"loud_noise","condition":"noise_db > 70","query":"주변 소음이 크게 감지되었습니다. 괜찮으신가요?"}
+{"sensor":"mic","case":"very_loud_noise","condition":"noise_db > 85","query":"매우 큰 소리가 감지되었습니다. 무언가 떨어지거나 이상 상황이 있었나요?"}
+{"sensor":"mic","case":"sudden_sharp_sound","condition":"sudden_sound_peak == true","query":"갑작스러운 큰 소리가 감지되었습니다. 의도된 소리인가요, 아니면 확인이 필요한 상황인가요?"}
+{"sensor":"mic","case":"continuous_noise_during_sleep","condition":"noise_db remains high during sleep","query":"수면 중 주변 소음이 지속적으로 높게 감지되었습니다. 잠을 자는 데 불편함이 있으신가요?"}
+{"sensor":"mic","case":"no_sound_after_activity","condition":"mic_level is very low and radar_motion == true","query":"움직임은 감지되지만 소리가 거의 감지되지 않습니다. 괜찮으신가요?"}
+{"sensor":"radar","case":"fast_breathing","condition":"breathing_rate > 24","query":"호흡수가 빠르게 감지되었습니다. 긴장했거나 운동 후이거나 불편하신가요?"}
+{"sensor":"radar","case":"slow_breathing","condition":"breathing_rate < 10","query":"호흡수가 낮게 감지되었습니다. 깊이 잠들어 계신가요, 아니면 몸이 불편하신가요?"}
+{"sensor":"radar","case":"irregular_breathing","condition":"breathing_pattern == irregular","query":"호흡 패턴이 불규칙하게 감지되었습니다. 편안한 상태이신가요?"}
+{"sensor":"radar","case":"restless_sleep_movement","condition":"sleep_movement_count is high","query":"수면 중 움직임이 많이 감지되었습니다. 잠자리가 불편하신가요?"}
+{"sensor":"radar","case":"no_breathing_detected","condition":"breathing_signal == not_detected","query":"호흡 신호가 명확하게 감지되지 않습니다. 침대에서 벗어나셨거나 자세를 바꾸셨나요?"}
+{"sensor":"temperature","case":"room_too_hot","condition":"room_temperature > 30.0","query":"실내 온도가 높게 감지되었습니다. 덥게 느껴지시나요?"}
+{"sensor":"temperature","case":"room_very_hot","condition":"room_temperature > 35.0","query":"실내 온도가 매우 높게 감지되었습니다. 냉방을 켜거나 다른 사람에게 알릴까요?"}
+{"sensor":"temperature","case":"room_too_cold","condition":"room_temperature < 16.0","query":"실내 온도가 낮게 감지되었습니다. 춥게 느껴지시나요?"}
+{"sensor":"temperature","case":"sudden_room_temperature_change","condition":"abs(room_temperature_delta) > 5.0","query":"실내 온도가 갑자기 변했습니다. 창문, 문, 히터, 에어컨 상태가 바뀌었나요?"}
+{"sensor":"temperature","case":"bad_sleep_temperature","condition":"sleep_room_temperature outside comfort_range","query":"수면에 적합하지 않은 실내 온도로 보입니다. 실내 온도를 조절할까요?"}
+{"sensor":"humidity","case":"too_dry","condition":"humidity < 30","query":"실내 공기가 건조하게 감지되었습니다. 목, 코, 눈이 불편하신가요?"}
+{"sensor":"humidity","case":"very_dry","condition":"humidity < 20","query":"실내가 매우 건조합니다. 가습기를 사용할까요?"}
+{"sensor":"humidity","case":"too_humid","condition":"humidity > 70","query":"실내 습도가 높게 감지되었습니다. 답답하거나 불편하신가요?"}
+{"sensor":"humidity","case":"very_humid","condition":"humidity > 80","query":"실내 습도가 매우 높습니다. 환기를 하거나 제습이 필요할 수 있습니다. 조치할까요?"}
+{"sensor":"humidity","case":"bad_sleep_humidity","condition":"sleep_humidity outside 40_to_60","query":"수면에 적합하지 않은 습도로 보입니다. 실내 습도를 조절할까요?"}
